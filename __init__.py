@@ -1,9 +1,9 @@
 bl_info = {
-    "name": "Terrence Engine Mesh Export",
+    "name": "Terrence Engine Header Export",
     "author": "Flowering",
     "version": (1, 0),
     "blender": (5, 0, 0),
-    "location": "File > Export > Wii Engine Mesh (.h)",
+    "location": "File > Export > Terrence Engine Header (.h)",
     "category": "Import-Export",
 }
 
@@ -15,7 +15,7 @@ from .exporter import ExportWiiMesh
 def menu_func_export(self, context):
     self.layout.operator(
         ExportWiiMesh.bl_idname,
-        text="Wii Engine Mesh (.h)"
+        text="Terrence Engine Header (.h)"
     )
 
 

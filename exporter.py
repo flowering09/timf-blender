@@ -1,4 +1,5 @@
 import bpy
+import os 
 
 from bpy.types import Operator
 from bpy_extras.io_utils import ExportHelper
@@ -9,7 +10,7 @@ from bpy.props import StringProperty, BoolProperty
 class ExportWiiMesh(Operator, ExportHelper):
 
     bl_idname = "export_mesh.wii_h"
-    bl_label = "Export Wii Engine Mesh"
+    bl_label = "Export Terrence Engine Mesh"
 
     filename_ext = ".h"
 
@@ -487,14 +488,9 @@ def export_mesh(objects, filepath):
 
         obj_vertices, obj_indices = collect_mesh_data(obj)
 
-
         offset = len(vertices)
 
-
-        vertices.extend(
-            obj_vertices
-        )
-
+        vertices.extend(obj_vertices)
 
         indices.extend(
             [
@@ -504,9 +500,13 @@ def export_mesh(objects, filepath):
         )
 
 
+    name = os.path.splitext(
+        os.path.basename(filepath)
+    )[0]
+
 
     write_mesh_header(
-        objects[0].name,
+        name,
         vertices,
         indices,
         filepath
@@ -616,7 +616,9 @@ def export_animation(objects, filepath):
 
 
     name = clean_name(
-        objects[0].name
+        os.path.splitext(
+            os.path.basename(filepath)
+        )[0]
     )
 
 
@@ -630,7 +632,8 @@ def export_animation(objects, filepath):
 
 
         f.write(
-            '#include "vertex.h"\n\n'
+            '#include "vertex.h"\n'
+            '#include "meshanimation.h"\n\n'
         )
 
 
