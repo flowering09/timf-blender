@@ -1,9 +1,9 @@
 bl_info = {
-    "name": "Terrence Engine Header Export",
+    "name": "Terrence Engine Intermediate Export",
     "author": "Flowering",
     "version": (1, 0),
     "blender": (5, 0, 0),
-    "location": "File > Export > Terrence Engine Header (.h)",
+    "location": "File > Export > Terrence Intermediate Format (.timf, .tiaf)",
     "category": "Import-Export",
 }
 
@@ -15,7 +15,7 @@ from .exporter import ExportWiiMesh
 def menu_func_export(self, context):
     self.layout.operator(
         ExportWiiMesh.bl_idname,
-        text="Terrence Engine Header (.h)"
+        text="Terrence Intermediate Format (.timf, .tiaf)"
     )
 
 

@@ -1,5 +1,6 @@
 import bpy
 import os 
+import struct
 
 from bpy.types import Operator
 from bpy_extras.io_utils import ExportHelper
@@ -12,10 +13,10 @@ class ExportWiiMesh(Operator, ExportHelper):
     bl_idname = "export_mesh.wii_h"
     bl_label = "Export Terrence Engine Mesh"
 
-    filename_ext = ".h"
+    filename_ext = ".timf"
 
     filter_glob: StringProperty(
-        default="*.h",
+        default="*.timf",
         options={'HIDDEN'}
     )
 
@@ -38,6 +39,13 @@ class ExportWiiMesh(Operator, ExportHelper):
 
 
     def execute(self, context):
+
+        base = os.path.splitext(self.filepath)[0]
+
+        if self.export_animation:
+            self.filepath = base + ".tiaf"
+        else:
+            self.filepath = base + ".timf"
 
         objects = [
             obj
@@ -353,136 +361,102 @@ def collect_mesh_data(obj, source_mesh=None):
 
     return vertices, indices
 
-def write_vertex_array(f, name, vertices):
-
-    f.write(
-        f"static Vertex {name}[] = {{\n"
-    )
+TIMF_MAGIC = b"TIMF"
+TIAF_MAGIC = b"TIAF"
+FORMAT_VERSION = 1
 
 
-    for vert in vertices:
+def write_timf(filepath, vertices, indices):
 
-        f.write(
-            "    { "
-            +
-            ", ".join(
-                f"{x:.6f}f"
-                for x in vert[:8]
+    with open(filepath, "wb") as f:
+
+        #
+        # Header
+        #
+
+        f.write(TIMF_MAGIC)
+        f.write(struct.pack("<I", FORMAT_VERSION))
+
+        f.write(struct.pack("<I", len(vertices)))
+        f.write(struct.pack("<I", len(indices)))
+
+        #
+        # Vertices
+        #
+
+        for vert in vertices:
+
+            f.write(
+                struct.pack(
+                    "<8f4B",
+                    *vert
+                )
             )
-            +
-            ", "
-            +
-            ", ".join(
-                str(x)
-                for x in vert[8:]
+
+        #
+        # Indices
+        #
+
+        for index in indices:
+
+            f.write(
+                struct.pack(
+                    "<H",
+                    index
+                )
             )
-            +
-            " },\n"
-        )
 
 
-    f.write(
-        "};\n\n"
-    )
+def write_tiaf(filepath, frames, indices):
 
+    with open(filepath, "wb") as f:
 
+        vertex_count = len(frames[0]) if frames else 0
 
+        #
+        # Header
+        #
 
+        f.write(TIAF_MAGIC)
+        f.write(struct.pack("<I", FORMAT_VERSION))
 
-def write_indices(f, name, indices):
+        f.write(struct.pack("<I", len(frames)))
+        f.write(struct.pack("<I", vertex_count))
+        f.write(struct.pack("<I", len(indices)))
 
-    f.write(
-        f"static unsigned short {name}[] = {{\n"
-    )
+        #
+        # Frame data
+        #
 
+        for frame in frames:
 
-    for i in range(
-        0,
-        len(indices),
-        3
-    ):
+            for vert in frame:
 
-        f.write(
-            f"    {indices[i]}, "
-            f"{indices[i+1]}, "
-            f"{indices[i+2]},\n"
-        )
+                f.write(
+                    struct.pack(
+                        "<8f4B",
+                        *vert
+                    )
+                )
 
+        #
+        # Shared indices
+        #
 
-    f.write(
-        "};\n\n"
-    )
+        for index in indices:
 
-
-
-
-
-def write_mesh_header(name, vertices, indices, filepath):
-
-    name = clean_name(name)
-
-
-    with open(filepath, "w") as f:
-
-        f.write(
-            "#pragma once\n\n"
-        )
-
-        f.write(
-            '#include "vertex.h"\n\n'
-        )
-
-
-        write_vertex_array(
-            f,
-            f"{name}_vertices",
-            vertices
-        )
-
-
-        write_indices(
-            f,
-            f"{name}_indices",
-            indices
-        )
-
-
-        f.write(
-            f"static Mesh {name}_mesh = {{\n"
-        )
-
-
-        f.write(
-            f"    {name}_vertices,\n"
-        )
-
-
-        f.write(
-            f"    {len(vertices)},\n"
-        )
-
-
-        f.write(
-            f"    {name}_indices,\n"
-        )
-
-
-        f.write(
-            f"    {len(indices)}\n"
-        )
-
-
-        f.write(
-            "};\n"
-        )
-
+            f.write(
+                struct.pack(
+                    "<H",
+                    index
+                )
+            )
 
 
 def export_mesh(objects, filepath):
 
     vertices = []
     indices = []
-
 
     for obj in objects:
 
@@ -493,23 +467,14 @@ def export_mesh(objects, filepath):
         vertices.extend(obj_vertices)
 
         indices.extend(
-            [
-                i + offset
-                for i in obj_indices
-            ]
+            i + offset
+            for i in obj_indices
         )
 
-
-    name = os.path.splitext(
-        os.path.basename(filepath)
-    )[0]
-
-
-    write_mesh_header(
-        name,
+    write_timf(
+        filepath,
         vertices,
-        indices,
-        filepath
+        indices
     )
 
 def export_animation(objects, filepath):
@@ -623,98 +588,8 @@ def export_animation(objects, filepath):
 
 
 
-    with open(filepath, "w") as f:
-
-
-        f.write(
-            "#pragma once\n\n"
-        )
-
-
-        f.write(
-            '#include "vertex.h"\n'
-            '#include "meshanimation.h"\n\n'
-        )
-
-
-
-        #
-        # Frame vertex arrays
-        #
-
-        for i, vertices in enumerate(frames):
-
-            write_vertex_array(
-                f,
-                f"{name}_frame_{i}",
-                vertices
-            )
-
-
-
-        #
-        # Frame pointer list
-        #
-
-        f.write(
-            f"static Vertex* {name}_frames[] = {{\n"
-        )
-
-
-        for i in range(len(frames)):
-
-            f.write(
-                f"    {name}_frame_{i},\n"
-            )
-
-
-        f.write(
-            "};\n\n"
-        )
-
-
-
-        #
-        # Shared indices
-        #
-
-        write_indices(
-            f,
-            f"{name}_indices",
-            base_indices
-        )
-
-
-
-        #
-        # Animation object
-        #
-
-        f.write(
-            f"static MeshAnimation {name}_animation = {{\n"
-        )
-
-
-        f.write(
-            f"    {name}_frames,\n"
-        )
-
-
-        f.write(
-            f"    {len(frames)},\n"
-        )
-
-
-        f.write(
-            f"    {name}_indices,\n"
-        )
-
-
-        f.write(
-            f"    {len(base_indices)}\n"
-        )
-
-
-        f.write(
-            "};\n"
-        )
+    write_tiaf(
+        filepath,
+        frames,
+        base_indices
+    )
